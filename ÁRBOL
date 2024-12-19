@@ -2,22 +2,28 @@
 #include <cstdlib>
 using namespace std;
 
+// Definimos la estructura de un nodo del árbol AVL
 struct nodo {
-    int valor;
-    int altura;
-    struct nodo *izq, *der;
+    int valor;         // Valor almacenado en el nodo
+    int altura;        // Altura del nodo
+    struct nodo *izq;  // Puntero al subárbol izquierdo
+    struct nodo *der;  // Puntero al subárbol derecho
 };
 
-struct nodo *raiz, *aux, *aux2;
+// Punteros globales para manejar la raíz del árbol
+struct nodo *raiz = NULL, *aux, *aux2;
 
+// Función para obtener la altura de un nodo
 int altura(struct nodo *n) {
     return (n == NULL) ? 0 : n->altura;
 }
 
+// Función para calcular el factor de balanceo de un nodo
 int balance(struct nodo *n) {
     return (n == NULL) ? 0 : altura(n->izq) - altura(n->der);
 }
 
+// Rotación a la derecha para reequilibrar el árbol
 struct nodo* rotarDerecha(struct nodo *y) {
     struct nodo *x = y->izq;
     struct nodo *T2 = x->der;
@@ -31,6 +37,7 @@ struct nodo* rotarDerecha(struct nodo *y) {
     return x;
 }
 
+// Rotación a la izquierda para reequilibrar el árbol
 struct nodo* rotarIzquierda(struct nodo *x) {
     struct nodo *y = x->der;
     struct nodo *T2 = y->izq;
@@ -44,85 +51,112 @@ struct nodo* rotarIzquierda(struct nodo *x) {
     return y;
 }
 
-void insertar(int valor) {
-    if (raiz == NULL) {
-        raiz = (struct nodo*)malloc(sizeof(struct nodo));
-        raiz->valor = valor;
-        raiz->altura = 1;
-        raiz->izq = raiz->der = NULL;
-        return;
+// Función para insertar un valor en el árbol AVL
+struct nodo* insertar(struct nodo* n, int valor) {
+    if (n == NULL) {
+        struct nodo* nuevo = (struct nodo*)malloc(sizeof(struct nodo));
+        nuevo->valor = valor;
+        nuevo->altura = 1;
+        nuevo->izq = nuevo->der = NULL;
+        return nuevo;
     }
 
-    aux = raiz;
-    while (aux != NULL) {
-        aux2 = aux;
-        if (valor < aux->valor) {
-            aux = aux->izq;
-        } else if (valor > aux->valor) {
-            aux = aux->der;
-        } else {
-            return;
-        }
-    }
-
-    struct nodo *nuevo = (struct nodo*)malloc(sizeof(struct nodo));
-    nuevo->valor = valor;
-    nuevo->altura = 1;
-    nuevo->izq = nuevo->der = NULL;
-
-    if (valor < aux2->valor) {
-        aux2->izq = nuevo;
+    if (valor < n->valor) {
+        n->izq = insertar(n->izq, valor);
+    } else if (valor > n->valor) {
+        n->der = insertar(n->der, valor);
     } else {
-        aux2->der = nuevo;
+        return n; // No se permiten valores duplicados
     }
+
+    n->altura = max(altura(n->izq), altura(n->der)) + 1;
+
+    int factor = balance(n);
+
+    // Casos de rotación
+    if (factor > 1 && valor < n->izq->valor)
+        return rotarDerecha(n);
+
+    if (factor < -1 && valor > n->der->valor)
+        return rotarIzquierda(n);
+
+    if (factor > 1 && valor > n->izq->valor) {
+        n->izq = rotarIzquierda(n->izq);
+        return rotarDerecha(n);
+    }
+
+    if (factor < -1 && valor < n->der->valor) {
+        n->der = rotarDerecha(n->der);
+        return rotarIzquierda(n);
+    }
+
+    return n;
 }
 
-void eliminar(int valor) {
-    aux = raiz;
-    aux2 = NULL;
+// Función para encontrar el nodo con el valor más pequeño
+struct nodo* nodoMinimo(struct nodo* n) {
+    struct nodo* actual = n;
 
-    while (aux != NULL && aux->valor != valor) {
-        aux2 = aux;
-        if (valor < aux->valor) {
-            aux = aux->izq;
-        } else {
-            aux = aux->der;
-        }
-    }
+    while (actual->izq != NULL)
+        actual = actual->izq;
 
-    if (aux == NULL) return;
-
-    if (aux->izq == NULL && aux->der == NULL) {
-        if (aux == raiz) {
-            raiz = NULL;
-        } else if (aux2->izq == aux) {
-            aux2->izq = NULL;
-        } else {
-            aux2->der = NULL;
-        }
-        free(aux);
-    } else if (aux->izq == NULL || aux->der == NULL) {
-        struct nodo *hijo = (aux->izq != NULL) ? aux->izq : aux->der;
-        if (aux == raiz) {
-            raiz = hijo;
-        } else if (aux2->izq == aux) {
-            aux2->izq = hijo;
-        } else {
-            aux2->der = hijo;
-        }
-        free(aux);
-    } else {
-        struct nodo *sucesor = aux->der;
-        while (sucesor->izq != NULL) {
-            sucesor = sucesor->izq;
-        }
-        int valorSucesor = sucesor->valor;
-        eliminar(sucesor->valor);
-        aux->valor = valorSucesor;
-    }
+    return actual;
 }
 
-void mostrar(struct nodo *actual, int nivel) {
+// Función para eliminar un nodo del árbol AVL
+struct nodo* eliminar(struct nodo* n, int valor) {
+    if (n == NULL) return n;
+
+    if (valor < n->valor) {
+        n->izq = eliminar(n->izq, valor);
+    } else if (valor > n->valor) {
+        n->der = eliminar(n->der, valor);
+    } else {
+        if ((n->izq == NULL) || (n->der == NULL)) {
+            struct nodo* temp = (n->izq != NULL) ? n->izq : n->der;
+
+            if (temp == NULL) {
+                temp = n;
+                n = NULL;
+            } else {
+                *n = *temp;
+            }
+            free(temp);
+        } else {
+            struct nodo* temp = nodoMinimo(n->der);
+            n->valor = temp->valor;
+            n->der = eliminar(n->der, temp->valor);
+        }
+    }
+
+    if (n == NULL) return n;
+
+    n->altura = max(altura(n->izq), altura(n->der)) + 1;
+
+    int factor = balance(n);
+
+    // Casos de rotación
+    if (factor > 1 && balance(n->izq) >= 0)
+        return rotarDerecha(n);
+
+    if (factor > 1 && balance(n->izq) < 0) {
+        n->izq = rotarIzquierda(n->izq);
+        return rotarDerecha(n);
+    }
+
+    if (factor < -1 && balance(n->der) <= 0)
+        return rotarIzquierda(n);
+
+    if (factor < -1 && balance(n->der) > 0) {
+        n->der = rotarDerecha(n->der);
+        return rotarIzquierda(n);
+    }
+
+    return n;
+}
+
+// Función para mostrar el árbol en formato jerárquico
+void mostrar(struct nodo* actual, int nivel) {
     if (actual != NULL) {
         mostrar(actual->der, nivel + 1);
         cout << string(nivel * 4, ' ') << actual->valor << endl;
@@ -130,6 +164,7 @@ void mostrar(struct nodo *actual, int nivel) {
     }
 }
 
+// Función principal
 int main() {
     int opcion, valor;
 
@@ -138,24 +173,25 @@ int main() {
         cout << "\n2. Mostrar";
         cout << "\n3. Eliminar";
         cout << "\n4. Salir";
-        cout << "\n\nOpcion: ";
+        cout << "\n\nOpción: ";
         cin >> opcion;
 
         switch (opcion) {
             case 1:
                 cout << "Valor a insertar: ";
                 cin >> valor;
-                insertar(valor);
+                raiz = insertar(raiz, valor);
                 break;
 
             case 2:
+                cout << "Árbol AVL:\n";
                 mostrar(raiz, 0);
                 break;
 
             case 3:
                 cout << "Valor a eliminar: ";
                 cin >> valor;
-                eliminar(valor);
+                raiz = eliminar(raiz, valor);
                 break;
 
             case 4:
@@ -163,10 +199,9 @@ int main() {
                 break;
 
             default:
-                cout << "Opcion no valida." << endl;
+                cout << "Opción no válida." << endl;
                 break;
         }
-
     } while (opcion != 4);
 
     return 0;
